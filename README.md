@@ -1,32 +1,75 @@
 # Bulk Certificate Generator
 
-A backend API for generating completion certificates in bulk using Python, FastAPI, SQLite, SQLAlchemy, and ReportLab.
+A backend API for generating completion certificates in bulk using **Python, FastAPI, SQLAlchemy, SQLite, and ReportLab**.
 
-## Overview
+The application accepts multiple recipients in a single request, validates the input, creates a generation job, processes certificates independently in the background, tracks generation status, handles individual failures, and provides PDF download endpoints.
 
-The Bulk Certificate Generator allows a client to submit a single request containing multiple recipients.
+## Features
 
-The application:
-
-1. Validates the request data.
-2. Creates a generation job.
-3. Creates a certificate record for each recipient.
-4. Processes certificates in the background.
-5. Generates an individual PDF certificate for each valid recipient.
-6. Tracks the status and progress of the generation job.
-7. Continues processing if one certificate fails.
-8. Provides a download endpoint for successfully generated certificates.
+* Bulk certificate generation through a single API request
+* Request validation using Pydantic
+* Background certificate processing using FastAPI `BackgroundTasks`
+* Individual certificate status tracking
+* Job-level progress and success/failure counters
+* Failure isolation — one failed certificate does not stop the remaining certificates
+* PDF certificate generation using ReportLab
+* Generated certificate download endpoint
+* SQLite relational database using SQLAlchemy ORM
+* Automated API and service-level tests using Pytest
+* Interactive API documentation using Swagger/OpenAPI
 
 ## Technology Stack
 
-* Python
-* FastAPI
-* SQLAlchemy
-* SQLite
-* Pydantic
-* ReportLab
-* Pytest
-* Uvicorn
+| Technology | Purpose                                 |
+| ---------- | --------------------------------------- |
+| Python     | Backend programming language            |
+| FastAPI    | REST API framework                      |
+| SQLAlchemy | ORM and database operations             |
+| SQLite     | Relational database                     |
+| Pydantic   | Request validation and response schemas |
+| ReportLab  | PDF certificate generation              |
+| Pytest     | Automated testing                       |
+| Uvicorn    | ASGI server                             |
+
+## Architecture
+
+```text
+Client
+  |
+  | POST /api/v1/generation-jobs
+  | Multiple recipients
+  v
+FastAPI
+  |
+  +-- Validate request
+  |
+  +-- Create GenerationJob
+  |
+  +-- Create Certificate records
+  |
+  +-- Start background processing
+  |
+  v
+Background Processing
+  |
+  +-- Generate Certificate 1
+  +-- Generate Certificate 2
+  +-- Generate Certificate 3
+  |
+  v
+SQLite Database
+  |
+  +-- Update job status
+  +-- Update certificate status
+  +-- Store file paths/errors
+  |
+  v
+Client
+  |
+  +-- Check job status
+  |
+  +-- Download completed certificates
+```
 
 ## Project Structure
 
@@ -42,26 +85,36 @@ bulk-certificate-generator/
 │   ├── certificate_service.py
 │   └── processing_services.py
 │
-├── storage/
-│   └── certificates/
-│
 ├── tests/
 │   └── tests/
 │       └── test_generation_job.py
 │
-├── venv/
-├── certificates.db
+├── .gitignore
+├── README.md
 ├── requirements.txt
-└── README.md
+└── test_certificate.py
 ```
+
+Generated PDFs are stored locally under:
+
+```text
+storage/certificates/
+```
+
+The virtual environment and local SQLite database are intentionally excluded from Git using `.gitignore`.
 
 ## Setup
 
-### 1. Clone or create the project
+### 1. Clone the repository
 
-Open the project directory in VS Code.
+```bash
+git clone https://github.com/abrarmaniyar7090/bulk-certificate-generator.git
+cd bulk-certificate-generator
+```
 
 ### 2. Create a virtual environment
+
+Windows:
 
 ```powershell
 python -m venv venv
@@ -69,7 +122,7 @@ python -m venv venv
 
 ### 3. Activate the virtual environment
 
-On Windows:
+Windows PowerShell:
 
 ```powershell
 venv\Scripts\activate
@@ -83,7 +136,7 @@ pip install -r requirements.txt
 
 ## Run the Application
 
-Start the FastAPI server using:
+Start the FastAPI server:
 
 ```powershell
 uvicorn app.main:app --reload
@@ -95,11 +148,20 @@ The API will be available at:
 http://127.0.0.1:8000
 ```
 
-FastAPI interactive documentation is available at:
+Interactive Swagger documentation:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
+
+## API Endpoints
+
+| Method | Endpoint                                         | Purpose                                     |
+| ------ | ------------------------------------------------ | ------------------------------------------- |
+| `GET`  | `/health`                                        | Check API health                            |
+| `POST` | `/api/v1/generation-jobs`                        | Create a bulk certificate generation job    |
+| `GET`  | `/api/v1/generation-jobs/{job_id}`               | Check job progress and certificate statuses |
+| `GET`  | `/api/v1/certificates/{certificate_id}/download` | Download a generated certificate            |
 
 ## Health Check
 
@@ -127,7 +189,7 @@ A single request can contain multiple recipients.
 POST /api/v1/generation-jobs
 ```
 
-Example request body:
+Example:
 
 ```json
 {
@@ -162,7 +224,7 @@ Example request body:
 }
 ```
 
-The API accepts all recipients in one request instead of requiring one API request per certificate.
+The API accepts all recipients in one request instead of requiring one API call per certificate.
 
 ## Check Generation Job Status
 
@@ -205,30 +267,32 @@ GET /api/v1/generation-jobs/1
 
 ### Job Statuses
 
-The application supports the following job states:
-
-* `pending` — Job has been created but processing has not started.
-* `processing` — Certificates are currently being generated.
-* `completed` — All certificates were generated successfully.
-* `completed_with_errors` — Some certificates succeeded and some failed.
-* `failed` — All certificate generations failed.
+| Status                  | Meaning                                             |
+| ----------------------- | --------------------------------------------------- |
+| `pending`               | Job has been created but processing has not started |
+| `processing`            | Certificates are currently being generated          |
+| `completed`             | All certificates were generated successfully        |
+| `completed_with_errors` | Some certificates succeeded and some failed         |
+| `failed`                | All certificate generations failed                  |
 
 ## Certificate Statuses
 
 Each certificate is tracked independently.
 
-Possible statuses are:
+Possible statuses:
 
-* `pending`
-* `processing`
-* `completed`
-* `failed`
+```text
+pending
+processing
+completed
+failed
+```
 
 This allows the application to identify exactly which recipients succeeded or failed.
 
 ## Download a Certificate
 
-After a certificate has been successfully generated, it can be downloaded using:
+After a certificate has been successfully generated:
 
 ```http
 GET /api/v1/certificates/{certificate_id}/download
@@ -242,11 +306,11 @@ GET /api/v1/certificates/1/download
 
 The API returns the generated PDF file.
 
-## Validation
+## Input Validation
 
-The API validates recipient information using Pydantic.
+Recipient information is validated using Pydantic.
 
-For example, an invalid email address:
+For example, an invalid email:
 
 ```json
 {
@@ -256,25 +320,27 @@ For example, an invalid email address:
 }
 ```
 
-returns HTTP:
+returns:
 
 ```text
 422 Unprocessable Entity
 ```
 
-The API also validates minimum and maximum lengths for recipient names, course names, and event names.
+The API also validates:
 
-At least one recipient is required for a generation job.
+* Minimum and maximum name length
+* Minimum and maximum course name length
+* Minimum and maximum event name length
+* Valid email format
+* At least one recipient per generation job
 
 ## Error Handling
 
 Certificate generation is handled independently for each recipient.
 
-If one certificate fails, the exception is captured and stored against that certificate.
+If one certificate fails, the exception is captured and stored against that certificate. Processing then continues with the remaining recipients.
 
-Processing then continues with the remaining recipients.
-
-For example:
+Example:
 
 ```text
 Recipient 1 → completed
@@ -288,7 +354,7 @@ The final job status becomes:
 completed_with_errors
 ```
 
-The job counters would be:
+Example counters:
 
 ```text
 total_count     = 3
@@ -301,13 +367,13 @@ This prevents a single failed certificate from stopping the entire bulk operatio
 
 ## Certificate Storage
 
-Generated PDF files are stored in:
+Generated PDF files are stored locally in:
 
 ```text
 storage/certificates/
 ```
 
-Files are named using their certificate database ID:
+Files are named using the certificate database ID:
 
 ```text
 certificate_1.pdf
@@ -323,9 +389,9 @@ The application uses two main tables.
 
 ### GenerationJob
 
-Stores information about the bulk generation request.
+Stores information about the complete bulk generation request.
 
-Important fields include:
+Important fields:
 
 * `id`
 * `event_name`
@@ -339,7 +405,7 @@ Important fields include:
 
 Stores information about each individual certificate.
 
-Important fields include:
+Important fields:
 
 * `id`
 * `job_id`
@@ -351,50 +417,52 @@ Important fields include:
 * `error_message`
 * `created_at`
 
-The relationship is:
+### Relationship
 
 ```text
 GenerationJob
-      │
-      ├── Certificate
-      ├── Certificate
-      └── Certificate
+      |
+      +── Certificate
+      |
+      +── Certificate
+      |
+      +── Certificate
 ```
 
 One generation job can therefore contain many certificates.
 
 ## Background Processing
 
-The API uses FastAPI `BackgroundTasks` to process certificate generation after the generation job is created.
+The API uses FastAPI `BackgroundTasks` to process certificate generation after the generation job has been created.
 
-The flow is:
+The processing flow is:
 
 ```text
 Client
-   │
-   │ POST generation request
-   ▼
-FastAPI API
-   │
-   ├── Validate request
-   ├── Create generation job
-   ├── Create certificate records
-   │
-   ▼
+   |
+   | POST generation request
+   v
+FastAPI
+   |
+   +-- Validate request
+   +-- Create generation job
+   +-- Create certificate records
+   |
+   v
 Background Processing
-   │
-   ├── Generate Certificate 1
-   ├── Generate Certificate 2
-   ├── Generate Certificate 3
-   │
-   ▼
+   |
+   +-- Generate Certificate 1
+   +-- Generate Certificate 2
+   +-- Generate Certificate 3
+   |
+   v
 Update Database
-   │
-   ▼
+   |
+   v
 Client checks job status
 ```
 
-For this assignment, FastAPI BackgroundTasks keeps the implementation simple.
+For this assignment, FastAPI `BackgroundTasks` keeps the implementation simple while demonstrating asynchronous-style job processing.
 
 For a production-scale system with very large workloads, a dedicated task queue such as Celery with Redis or another message broker could be introduced.
 
@@ -402,7 +470,7 @@ For a production-scale system with very large workloads, a dedicated task queue 
 
 The project uses Pytest.
 
-Run all tests using:
+Run all tests:
 
 ```powershell
 pytest
@@ -416,19 +484,21 @@ The test suite covers:
 4. Individual certificate failure handling
 5. Certificate retrieval/download
 
-Expected result:
+Current test result:
 
 ```text
 5 passed
 ```
 
+The failure-handling test verifies that if one certificate fails, the remaining certificates continue processing successfully.
+
 ## Design Decisions
 
 ### Bulk API
 
-The API accepts multiple recipients in one request.
+The API accepts multiple recipients in a single request.
 
-This avoids making a separate API call for every certificate.
+This avoids requiring a separate API request for every certificate.
 
 ### Relational Database
 
@@ -454,13 +524,13 @@ Therefore, a failure for one recipient does not terminate the entire job.
 
 ReportLab is used to generate PDF certificates from a predefined certificate layout.
 
-The certificate generation logic is isolated in:
+The PDF generation logic is isolated in:
 
 ```text
 app/certificate_service.py
 ```
 
-This makes the PDF generation logic easier to modify independently from the API layer.
+This makes the certificate-generation logic easier to modify independently from the API layer.
 
 ## Future Improvements
 
@@ -473,7 +543,7 @@ For a production-ready implementation, the following improvements could be consi
 * Authentication and authorization
 * API rate limiting
 * Structured logging
-* Retry mechanism for transient certificate-generation failures
+* Retry mechanisms for transient failures
 * Database migrations using Alembic
 * More comprehensive integration tests
 * Email notification after bulk generation
@@ -505,4 +575,15 @@ Check job progress
 Download completed certificates
 ```
 
-The implementation is designed to be simple enough for the assignment while demonstrating important backend concepts such as API design, validation, relational data modeling, background processing, error isolation, file generation, and automated testing.
+The implementation demonstrates practical backend development concepts including:
+
+* REST API design
+* Request validation
+* Relational data modeling
+* SQLAlchemy ORM
+* Background processing
+* Error isolation
+* PDF generation
+* File handling
+* Automated testing
+* API documentation
