@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+
+certificates.db
+
+storage/certificates/*.pdf
+
+.pytest_cache/
+.coverage
+
+.env
